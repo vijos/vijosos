@@ -1,2 +1,2 @@
 # vijosos
-Vijos: Velocious Informatics Judge Operating System
+Vijos: Vijos Isn't Just an Operating System
