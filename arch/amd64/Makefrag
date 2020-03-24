@@ -1,0 +1,4 @@
+.PHONY: qemu
+qemu: kernel
+	false
+

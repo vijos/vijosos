@@ -1,0 +1,8 @@
+*.o
+*.elf
+kernel
+
+include/arch
+include/driver
+
+tftp_root/

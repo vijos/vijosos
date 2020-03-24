@@ -1,0 +1,6 @@
+CFLAGS += -mcmodel=medany
+
+.PHONY: qemu
+qemu: kernel
+	qemu-system-riscv64 -machine virt -nographic -kernel kernel -m 1024 -smp 1
+

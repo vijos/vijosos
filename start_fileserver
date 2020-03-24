@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sudo atftpd --daemon --no-fork --port 6969 --no-source-port-checking --logfile - tftp_root
