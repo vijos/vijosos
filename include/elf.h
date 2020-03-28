@@ -150,6 +150,7 @@ typedef struct
 #define PF_W		(1 << 1)	/* Segment is writable */
 #define PF_R		(1 << 2)	/* Segment is readable */
 
-void *load_elf(void *elf_addr);
+#include "arch/mmu.h"
+int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va);
 
 #endif

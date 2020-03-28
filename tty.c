@@ -1,5 +1,4 @@
 #include "tty.h"
-#include "driver/uartlite.h"
 
 const tty_ops_t *tty_ops;
 

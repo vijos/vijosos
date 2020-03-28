@@ -1,5 +1,5 @@
 #include "mm.h"
-#include "arch/mm.h"
+#include "arch/mmu.h"
 #include "utils.h"
 #include "string.h"
 #include "stdio.h"

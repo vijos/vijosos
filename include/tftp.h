@@ -11,9 +11,6 @@
 #define TFTP_OP_ACK 0x0400
 #define TFTP_OP_ERROR 0x0500
 
-#define TFTP_FILENAME "kernel"
-#define TFTP_FILENAME_SIZE (6 + 1)
-
 #define TFTP_MODE "octet"
 #define TFTP_MODE_SIZE (5 + 1)
 

@@ -25,11 +25,18 @@ typedef struct
 
 struct task
 {
-    struct regs regs;
+    regs_t regs;
     uint64_t wait;
     timer_t timer;
     wait_packet_t wait_packet;
 };
+
+typedef struct
+{
+    int32_t exitcode;
+    int32_t error;
+    uint64_t error_value;
+} user_task_t;
 
 #define WAIT_TTY_RECV (1 << 0)
 #define WAIT_TTY_SEND (1 << 1)

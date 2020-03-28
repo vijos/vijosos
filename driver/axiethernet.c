@@ -1,7 +1,7 @@
 #include "driver/axiethernet.h"
 #include "eth.h"
 #include "arch/asm.h"
-#include "arch/mm.h"
+#include "arch/mmu.h"
 #include "stdio.h"
 
 void *DMA_BASE;

@@ -52,6 +52,8 @@
 #define MSTATUS_SXL         0x0000000C00000000
 #define MSTATUS_SD          0x8000000000000000
 
+#define MSTATUS_MPP_SHIFT 11
+
 #define SSTATUS_UIE         0x00000001
 #define SSTATUS_SIE         0x00000002
 #define SSTATUS_UPIE        0x00000010
@@ -149,6 +151,12 @@
 #define PMP_NA4   0x10
 #define PMP_NAPOT 0x18
 
+#define CAUSE_ECALL_U  8
+#define CAUSE_PF_FETCH 12
+#define CAUSE_PF_LOAD  13
+#define CAUSE_PF_STORE 15
+#define CAUSE_INT      0x8000000000000000
+
 #define IRQ_S_SOFT   1
 #define IRQ_H_SOFT   2
 #define IRQ_M_SOFT   3
@@ -162,7 +170,7 @@
 #define IRQ_HOST     13
 
 #define DEFAULT_RSTVEC     0x00001000
-#define CLINT_BASE         0x02000000
+//#define CLINT_BASE         0x02000000
 #define CLINT_SIZE         0x000c0000
 
 #ifdef __riscv

@@ -18,6 +18,11 @@ static inline void flush_tlb()
     asm volatile ("sfence.vma");
 }
 
+static inline void flush_tlb_one(uintptr_t va)
+{
+    asm volatile ("sfence.vma %0" : : "r"(va));
+}
+
 static inline uint64_t rdcycle()
 {
     uint64_t v;
@@ -28,8 +33,5 @@ static inline uint64_t rdcycle()
 #define CLOCK_FREQ 125000000ul
 
 #define STACK_OFFSET (0)
-
-#define DRAM_BASE 0x80000000ul
-#define DRAM_SIZE 0x40000000ul
 
 #endif
