@@ -66,6 +66,7 @@ static inline pte_t pte_flags(uint64_t flags)
     if (flags & VM_X) pte |= PTE_X;
     if (flags & VM_A) pte |= PTE_A;
     if (flags & VM_D) pte |= PTE_D;
+    if (flags & VM_U) pte |= PTE_U;
     return pte;
 }
 
