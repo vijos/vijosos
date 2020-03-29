@@ -5,12 +5,6 @@
 #include "stdio.h"
 #include "string.h"
 
-int map_and_copy(pte_t *pt, uintptr_t va, uint64_t flags, void *src, size_t len)
-{
-    return -ENOIMPL;
-    return 0;
-}
-
 int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
 {
     uint8_t *u8 = (uint8_t *)elf;
@@ -38,7 +32,7 @@ int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
     uintptr_t entry = elf_header->e_entry;
     if (entry_va) *entry_va = entry;
 
-    printf("Loader: Kernel Entry is at 0x%016lx.\n", entry);
+    printf("Loader: ELF Entry is at 0x%016lx.\n", entry);
 
     if (!elf_header->e_phnum)
     {
@@ -87,8 +81,8 @@ int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
         {
             printf("Loader: Loading %02d... ", i);
 
-            if (!(phdr[i].p_offset <= phdr[i].p_offset + phdr[i].p_filesz
-                  && phdr[i].p_offset + phdr[i].p_filesz <= len))
+            if (phdr[i].p_filesz && !(phdr[i].p_offset <= phdr[i].p_offset + phdr[i].p_filesz
+                                      && phdr[i].p_offset + phdr[i].p_filesz <= len))
             {
                 puts("ELF file is too small.\n");
                 return -EOOB;
@@ -106,9 +100,9 @@ int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
                 return -EBADPKT;
             }
 
-            uintptr_t flags = 0;
+            uintptr_t flags = VM_U | VM_A;
             if (phdr[i].p_flags & PF_R) flags |= VM_R;
-            if (phdr[i].p_flags & PF_W) flags |= VM_W;
+            if (phdr[i].p_flags & PF_W) flags |= VM_W | VM_D;
             if (phdr[i].p_flags & PF_X) flags |= VM_X;
             int ret = map_and_copy(pt, phdr[i].p_vaddr, flags,
                                    u8 + phdr[i].p_offset, phdr[i].p_filesz);
@@ -120,7 +114,7 @@ int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
             if (phdr[i].p_filesz < phdr[i].p_memsz)
             {
                 puts("init .bss... ");
-                size_t file_end = (phdr[i].p_vaddr + phdr[i].p_filesz) & ~(PGSIZE - 1),
+                size_t file_end = PGALIGN_FLOOR(phdr[i].p_vaddr + phdr[i].p_filesz),
                        mem_end = PGALIGN(phdr[i].p_vaddr + phdr[i].p_memsz);
                 for (size_t pg = file_end; pg < mem_end; pg += PGSIZE)
                 {

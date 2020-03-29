@@ -15,6 +15,7 @@
 
 #define PGSIZE 0x1000ul
 #define PGALIGN(x) (((x) + PGSIZE - 1) & ~(PGSIZE - 1))
+#define PGALIGN_FLOOR(x) ((x) & ~(PGSIZE - 1))
 #define PGSHIFT 12
 
 #define SATP_MODE 0xF000000000000000

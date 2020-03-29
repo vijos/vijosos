@@ -7,6 +7,7 @@
 #include "error.h"
 #include "hwtimer.h"
 #include "eth.h"
+#include "tftp.h"
 #include "task.h"
 #include "string.h"
 #include "stdio.h"
@@ -25,7 +26,7 @@ void judge_entry()
 
     puts("Judge Daemon: started!\n");
 
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 3; ++i)
     {
         size_t elf_len;
         int ret = tftp_get_file("elf", 4, elf_buff, sizeof(elf_buff), &elf_len);
@@ -41,10 +42,9 @@ void judge_entry()
             mm_restore_snapshot();
             continue;
         }
-        //uintptr_t va = 0x3884411000ul;
-        //void *userpg = map_page(pt, va, VM_R | VM_X | VM_U);
-        //printf("userpg = 0x%016lx\n", (uintptr_t)userpg);
-        //*(uint64_t *)userpg = 0x7300016000;  // 1: j 1b; nop; ecall
+        // TODO: map heap and stack
+        // TODO: map stdin, stdout and stderr buffer
+        // TODO: put arguments into stack
         printf("Judge Daemon: Entering user-mode.\n");
         uintptr_t freq = hwtimer_get_freq();
         hwtimer_set_oneshot(freq + freq / 10 + 2000000); // 1.1s

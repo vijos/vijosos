@@ -17,6 +17,7 @@ extern pte_t *kernel_pt;
 pte_t *create_pt();
 pte_t *get_pte(pte_t *pt, uintptr_t va);
 void *map_page(pte_t *pt, uintptr_t va, uint64_t flags);
+int map_and_copy(pte_t *pt, uintptr_t va, uint64_t flags, void *src, size_t len);
 size_t count_pt(pte_t *pt, uint64_t flags);
 
 #endif

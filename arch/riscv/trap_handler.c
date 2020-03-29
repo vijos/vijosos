@@ -89,12 +89,16 @@ void trap_handler(trap_frame_t *tf)
     {
         uintptr_t ad = PTE_A;
         if (tf->cause == CAUSE_PF_STORE) ad |= PTE_D;
+        uintptr_t flags = PTE_V | PTE_U;
+        if (tf->cause == CAUSE_PF_FETCH) flags |= PTE_X;
+        if (tf->cause == CAUSE_PF_LOAD) flags |= PTE_R;
+        if (tf->cause == CAUSE_PF_STORE) flags |= PTE_R | PTE_W;
         uintptr_t va = tf->tval;
         pte_t *pte = get_pte(p2v(read_csr(satp) << PGSHIFT), va);
-        if (pte && (*pte & (PTE_V | PTE_U)) == (PTE_V | PTE_U))
+        if (pte && (*pte & flags) == flags)
         {
-            if (ad & PTE_A) printf("setting a bit\n");
-            if (ad & PTE_D) printf("setting a bit\n");
+            // if (ad & PTE_A) printf("setting a bit\n");
+            // if (ad & PTE_D) printf("setting d bit\n");
             *pte |= ad;
             flush_tlb_one(va);
             return;
@@ -105,7 +109,8 @@ void trap_handler(trap_frame_t *tf)
             user_end_time = tf->cycle;
             user_task.exitcode = -1;
             user_task.error = -EPAGEFAULT;
-            user_task.error_value = va;
+            user_task.epc = tf->epc;
+            user_task.eval = va;
             arch_return_from_user();
         }
     }
@@ -131,7 +136,8 @@ void trap_handler(trap_frame_t *tf)
             // Something goes wrong.
             user_task.exitcode = -1;
             user_task.error = -EUSER;
-            user_task.error_value = tf->tval;
+            user_task.epc = tf->epc;
+            user_task.eval = tf->tval;
         }
         arch_return_from_user();
     }

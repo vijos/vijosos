@@ -35,7 +35,8 @@ typedef struct
 {
     int32_t exitcode;
     int32_t error;
-    uint64_t error_value;
+    uint64_t epc;
+    uint64_t eval;
 } user_task_t;
 
 #define WAIT_TTY_RECV (1 << 0)

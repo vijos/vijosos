@@ -33,7 +33,7 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
     char *mode = req_filename + filename_size;
     memcpy(mode, TFTP_MODE, TFTP_MODE_SIZE);
 
-    printf("TFTP Client: Getting %s...\r\n", filename);
+    printf("TFTP Client: Getting %s...\n", filename);
 
     // Send the request and wait for the first data block.
     size_t ret;
@@ -50,25 +50,25 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
 
     if (ret < sizeof(tftp_packet_t))
     {
-        printf("TFTP Client: UDP datagram is too small.\r\n");
+        printf("TFTP Client: UDP datagram is too small.\n");
         return -EBADPKT;
     }
 
     if (tftp_packet->opcode == TFTP_OP_ERROR)
     {
-        printf("TFTP Client: Error %d: %s\r\n",
+        printf("TFTP Client: Error %d: %s\n",
                ntohs(tftp_packet->seq), (uint8_t *)(tftp_packet + 1));
         return -EBADPKT;
     }
     else if (tftp_packet->opcode != TFTP_OP_DATA)
     {
-        printf("TFTP Client: Unknown Opcode %d\r\n", ntohs(tftp_packet->opcode));
+        printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_packet->opcode));
         return -EBADPKT;
     }
 
     if (tftp_packet->seq != htons(1))
     {
-        printf("TFTP Client: Not First Block???\r\n");
+        printf("TFTP Client: Not First Block???\n");
         return -EBADPKT;
     }
 
@@ -84,7 +84,7 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
 
     if (data_len < TFTP_CHUNK_SIZE)
     {
-        printf("TFTP Client: Done, received %lu bytes.\r\n", total_len);
+        printf("TFTP Client: Done, received %lu bytes.\n", total_len);
         if (out_len) *out_len = total_len;
         return 0;
     }
@@ -100,25 +100,25 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
                        server_ip, server_port, 30 * CLOCK_FREQ);
         if (ret == 0)
         {
-            printf("TFTP Client: Timed out!\r\n");
+            printf("TFTP Client: Timed out!\n");
             return -EBADPKT;
         }
 
         if (ret < sizeof(tftp_packet_t))
         {
-            printf("TFTP Client: UDP datagram is too small.\r\n");
+            printf("TFTP Client: UDP datagram is too small.\n");
             return -EBADPKT;
         }
 
         if (tftp_packet->opcode == TFTP_OP_ERROR)
         {
-            printf("TFTP Client: Error %d: %s\r\n", 
+            printf("TFTP Client: Error %d: %s\n",
                    ntohs(tftp_packet->seq), (uint8_t *)(tftp_packet + 1));
             return -EBADPKT;
         }
         else if (tftp_packet->opcode != TFTP_OP_DATA)
         {
-            printf("TFTP Client: Unknown Opcode %d\r\n", ntohs(tftp_packet->opcode));
+            printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_packet->opcode));
             return -EBADPKT;
         }
 
@@ -139,7 +139,7 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
 
             if (data_len < TFTP_CHUNK_SIZE)
             {
-                printf("\r\nTFTP Client: Done, received %lu bytes.\r\n", total_len);
+                printf("\nTFTP Client: Done, received %lu bytes.\n", total_len);
                 if (out_len) *out_len = total_len;
                 return 0;
             }
@@ -148,7 +148,7 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
         }
         else
         {
-            printf("TFTP Client: Warning: Block %d is not in the window.\r\n",
+            printf("TFTP Client: Warning: Block %d is not in the window.\n",
                    ntohs(tftp_packet->seq));
         }
     }
