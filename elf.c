@@ -19,7 +19,7 @@ int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
 
     if (memcmp(elf_header->e_ident, ELFMAG, SELFMAG))
     {
-        puts("Loader: Not an ELF file.\n");
+        printf("Loader: Not an ELF file (0x%08x).\n", *(uint64_t *)elf_header->e_ident);
         return -EBADPKT;
     }
 

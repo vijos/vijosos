@@ -13,6 +13,9 @@ tftp_packet_t *const tftp_packet = (tftp_packet_t *)tftp_buff;
 __attribute__ ((aligned (16))) uint8_t tftp_req_buff[128];
 tftp_req_packet_t *const tftp_req = (tftp_req_packet_t *)tftp_req_buff;
 
+__attribute__ ((aligned (16))) uint8_t tftp_resp_buff[1024];
+tftp_packet_t *const tftp_resp = (tftp_packet_t *)tftp_resp_buff;
+
 int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, size_t *out_len)
 {
     if (sizeof(tftp_req_buff) < sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE)
@@ -33,12 +36,12 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
     char *mode = req_filename + filename_size;
     memcpy(mode, TFTP_MODE, TFTP_MODE_SIZE);
 
-    printf("TFTP Client: Getting %s...\n", filename);
+    printf("TFTP Client: Getting \"%s\"...\n", filename);
 
     // Send the request and wait for the first data block.
     size_t ret;
     uint16_t server_port;
-    while (1)
+    while (true)
     {
         send_udp(client_port, server_ip, TFTP_SERVER_PORT, tftp_req,
                  sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE);
@@ -92,7 +95,7 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
     printf("TFTP Client: Received %lu bytes.", total_len);
 
     uint16_t window = 2;
-    while (1)
+    while (true)
     {
         ipv6_addr_t saddr;
         uint16_t sport;
@@ -150,6 +153,131 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
         {
             printf("TFTP Client: Warning: Block %d is not in the window.\n",
                    ntohs(tftp_packet->seq));
+        }
+    }
+}
+
+int tftp_put_file(char *filename, size_t filename_size, tftp_read_block_t read_block, void *ctx)
+{
+    if (sizeof(tftp_req_buff) < sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE)
+    {
+        return -EOOB;
+    }
+
+    uint16_t client_port;
+    do
+    {
+        client_port = rdcycle() ^ 0x5744;
+    }
+    while (client_port < 1024);
+
+    tftp_req->opcode = TFTP_OP_WRQ;
+    char *req_filename = (char *)(tftp_req + 1);
+    memcpy(req_filename, filename, filename_size);
+    char *mode = req_filename + filename_size;
+    memcpy(mode, TFTP_MODE, TFTP_MODE_SIZE);
+
+    printf("TFTP Client: Putting \"%s\"...\n", filename);
+
+    // Send the request and wait for an ack.
+    size_t ret;
+    uint16_t server_port;
+    while (true)
+    {
+        send_udp(client_port, server_ip, TFTP_SERVER_PORT, tftp_req,
+                 sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE);
+        ipv6_addr_t saddr;
+        ret = recv_udp(client_port, &saddr, &server_port, tftp_resp_buff, sizeof(tftp_resp_buff),
+                       server_ip, 0, CLOCK_FREQ / 4);
+        if (ret != 0) break;
+    }
+
+    if (ret < sizeof(tftp_packet_t))
+    {
+        printf("TFTP Client: UDP datagram is too small.\n");
+        return -EBADPKT;
+    }
+
+    if (tftp_resp->opcode == TFTP_OP_ERROR)
+    {
+        printf("TFTP Client: Error %d: %s\n",
+               ntohs(tftp_resp->seq), (uint8_t *)(tftp_resp + 1));
+        return -EBADPKT;
+    }
+    else if (tftp_resp->opcode != TFTP_OP_ACK)
+    {
+        printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_resp->opcode));
+        return -EBADPKT;
+    }
+
+    if (tftp_resp->seq != htons(0))
+    {
+        printf("TFTP Client: Not First Ack???\n");
+        return -EBADPKT;
+    }
+
+    uint16_t window = 1;
+    while (true)
+    {
+        tftp_packet->opcode = TFTP_OP_DATA;
+        tftp_packet->seq = htons(window);
+        int block_size = read_block(ctx, tftp_packet + 1);
+        if (block_size < 0)
+        {
+            return block_size;
+        }
+
+        send_udp(client_port, server_ip, server_port, tftp_packet,
+                 sizeof(tftp_packet_t) + block_size);
+
+        while (true)
+        {
+            ipv6_addr_t saddr;
+            uint16_t sport;
+            ret = recv_udp(client_port, &saddr, &sport, tftp_resp_buff, sizeof(tftp_resp_buff),
+                           server_ip, server_port, 1 * CLOCK_FREQ);
+            if (ret == 0)
+            {
+                printf("TFTP Client: Timed out!\n");
+                send_udp(client_port, server_ip, server_port, tftp_packet,
+                         sizeof(tftp_packet_t) + block_size);
+                continue;
+            }
+
+            if (ret < sizeof(tftp_packet_t))
+            {
+                printf("TFTP Client: UDP datagram is too small.\n");
+                return -EBADPKT;
+            }
+
+            if (tftp_resp->opcode == TFTP_OP_ERROR)
+            {
+                printf("TFTP Client: Error %d: %s\n",
+                       ntohs(tftp_resp->seq), (uint8_t *)(tftp_resp + 1));
+                return -EBADPKT;
+            }
+            else if (tftp_resp->opcode != TFTP_OP_ACK)
+            {
+                printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_resp->opcode));
+                return -EBADPKT;
+            }
+
+            if (tftp_resp->seq == tftp_packet->seq)
+            {
+                break;
+            }
+            else
+            {
+                printf("TFTP Client: Warning: Ack %d is not in the window.\n",
+                       ntohs(tftp_resp->seq));
+                continue;
+            }
+        }
+
+        ++window;
+        if (block_size < TFTP_CHUNK_SIZE)
+        {
+            break;
         }
     }
 }
