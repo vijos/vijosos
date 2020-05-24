@@ -34,15 +34,19 @@ typedef struct
 typedef struct
 {
     size_t seq;
-    size_t time_limit;  // clock ticks
+    size_t time_limit;  // clock cycles
     size_t mem_limit;  // unused
 } judge_req_t;
+
+#define JUDGE_RESP_ACK 1
+#define JUDGE_RESP_RESULT 2
 
 typedef struct
 {
     size_t seq;
+    uintptr_t flags;
     intptr_t exitcode;
-    size_t time_usage;  // clock ticks
+    size_t time_usage;  // clock cycles
     size_t mem_usage;  // KiB
 } judge_resp_t;
 
@@ -235,6 +239,36 @@ void judge_entry()
 
     judge_req_t req;
     judge_resp_t resp;
+
+    while (true)
+    {
+        ipv6_addr_t saddr;
+        uint16_t sport;
+        size_t ret = recv_udp(JUDGE_SERVER_PORT, &saddr, &sport, &req, sizeof(req),
+                              ipv6_unspecified(), 0, 1 * CLOCK_FREQ);
+        if (ret == 0)
+        {
+            continue;
+        }
+
+        if (ret != sizeof(req))
+        {
+            printf("Judge Daemon: Bad request.\n");
+            continue;
+        }
+
+        memset(&resp, 0, sizeof(resp));
+        resp.seq = req.seq;
+        resp.flags = JUDGE_RESP_ACK;
+        send_udp(JUDGE_SERVER_PORT, saddr, sport, &resp, sizeof(resp));
+
+        mm_take_snapshot();
+        do_judge(&req, &resp);
+        mm_restore_snapshot();
+
+        resp.flags = JUDGE_RESP_ACK | JUDGE_RESP_RESULT;
+        send_udp(JUDGE_SERVER_PORT, saddr, sport, &resp, sizeof(resp));
+    }
 
     for (int i = 0; i < 3; ++i)
     {
