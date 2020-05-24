@@ -16,57 +16,87 @@ tftp_req_packet_t *const tftp_req = (tftp_req_packet_t *)tftp_req_buff;
 __attribute__ ((aligned (16))) uint8_t tftp_resp_buff[1024];
 tftp_packet_t *const tftp_resp = (tftp_packet_t *)tftp_resp_buff;
 
-int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, size_t *out_len)
+static uint16_t get_port()
 {
-    if (sizeof(tftp_req_buff) < sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE)
+    uint16_t port;
+    do
+    {
+        port = rdcycle() ^ 0x5744;
+    }
+    while (port < 1024);
+    return port;
+}
+
+static int tftp_build_req(void *buff, size_t size,
+                          uint16_t opcode, char *filename, size_t filename_len)
+{
+    const size_t filename_size = filename_len + 1;
+    if (size < sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE)
     {
         return -EOOB;
     }
-
-    uint16_t client_port;
-    do
-    {
-        client_port = rdcycle() ^ 0x5744;
-    }
-    while (client_port < 1024);
-
-    tftp_req->opcode = TFTP_OP_RRQ;
-    char *req_filename = (char *)(tftp_req + 1);
+    tftp_req_packet_t *req = (tftp_req_packet_t *)buff;
+    req->opcode = opcode;
+    char *req_filename = (char *)(req + 1);
     memcpy(req_filename, filename, filename_size);
     char *mode = req_filename + filename_size;
     memcpy(mode, TFTP_MODE, TFTP_MODE_SIZE);
+    return sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE;
+}
+
+static int tftp_check_resp(void *buff, size_t size, uint16_t expected_opcode)
+{
+    if (size < sizeof(tftp_packet_t))
+    {
+        printf("TFTP Client: UDP datagram is too small.\n");
+        return -EBADPKT;
+    }
+
+    tftp_packet_t *resp = (tftp_packet_t *)buff;
+
+    if (resp->opcode == TFTP_OP_ERROR)
+    {
+        printf("TFTP Client: Error %d: %s\n",
+               ntohs(resp->seq), (uint8_t *)(resp + 1));
+        return -EBADPKT;
+    }
+    else if (resp->opcode != expected_opcode)
+    {
+        printf("TFTP Client: Unexpected Opcode %d\n", ntohs(resp->opcode));
+        return -EBADPKT;
+    }
+
+    return 0;
+}
+
+int tftp_get_file(char *filename, size_t filename_len, void *buff, size_t len, size_t *out_len)
+{
+    int req_size = tftp_build_req(tftp_req, sizeof(tftp_req_buff),
+                                  TFTP_OP_RRQ, filename, filename_len);
+    if (req_size < 0)
+    {
+        return req_size;
+    }
 
     printf("TFTP Client: Getting \"%s\"...\n", filename);
 
     // Send the request and wait for the first data block.
     size_t ret;
+    uint16_t client_port = get_port();
     uint16_t server_port;
     while (true)
     {
-        send_udp(client_port, server_ip, TFTP_SERVER_PORT, tftp_req,
-                 sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE);
+        send_udp(client_port, server_ip, TFTP_SERVER_PORT, tftp_req, req_size);
         ipv6_addr_t saddr;
         ret = recv_udp(client_port, &saddr, &server_port, tftp_buff, sizeof(tftp_buff),
                        server_ip, 0, CLOCK_FREQ / 4);
         if (ret != 0) break;
     }
 
-    if (ret < sizeof(tftp_packet_t))
+    int r = tftp_check_resp(tftp_packet, ret, TFTP_OP_DATA);
+    if (r < 0)
     {
-        printf("TFTP Client: UDP datagram is too small.\n");
-        return -EBADPKT;
-    }
-
-    if (tftp_packet->opcode == TFTP_OP_ERROR)
-    {
-        printf("TFTP Client: Error %d: %s\n",
-               ntohs(tftp_packet->seq), (uint8_t *)(tftp_packet + 1));
-        return -EBADPKT;
-    }
-    else if (tftp_packet->opcode != TFTP_OP_DATA)
-    {
-        printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_packet->opcode));
-        return -EBADPKT;
+        return r;
     }
 
     if (tftp_packet->seq != htons(1))
@@ -107,22 +137,10 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
             return -EBADPKT;
         }
 
-        if (ret < sizeof(tftp_packet_t))
+        int r = tftp_check_resp(tftp_packet, ret, TFTP_OP_DATA);
+        if (r < 0)
         {
-            printf("TFTP Client: UDP datagram is too small.\n");
-            return -EBADPKT;
-        }
-
-        if (tftp_packet->opcode == TFTP_OP_ERROR)
-        {
-            printf("TFTP Client: Error %d: %s\n",
-                   ntohs(tftp_packet->seq), (uint8_t *)(tftp_packet + 1));
-            return -EBADPKT;
-        }
-        else if (tftp_packet->opcode != TFTP_OP_DATA)
-        {
-            printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_packet->opcode));
-            return -EBADPKT;
+            return r;
         }
 
         tftp_packet->opcode = TFTP_OP_ACK;
@@ -157,57 +175,34 @@ int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, 
     }
 }
 
-int tftp_put_file(char *filename, size_t filename_size, tftp_read_block_t read_block, void *ctx)
+int tftp_put_file(char *filename, size_t filename_len, tftp_read_block_t read_block, void *ctx)
 {
-    if (sizeof(tftp_req_buff) < sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE)
+    int req_size = tftp_build_req(tftp_req, sizeof(tftp_req_buff),
+                                  TFTP_OP_WRQ, filename, filename_len);
+    if (req_size < 0)
     {
-        return -EOOB;
+        return req_size;
     }
-
-    uint16_t client_port;
-    do
-    {
-        client_port = rdcycle() ^ 0x5744;
-    }
-    while (client_port < 1024);
-
-    tftp_req->opcode = TFTP_OP_WRQ;
-    char *req_filename = (char *)(tftp_req + 1);
-    memcpy(req_filename, filename, filename_size);
-    char *mode = req_filename + filename_size;
-    memcpy(mode, TFTP_MODE, TFTP_MODE_SIZE);
 
     printf("TFTP Client: Putting \"%s\"...\n", filename);
 
     // Send the request and wait for an ack.
     size_t ret;
+    uint16_t client_port = get_port();
     uint16_t server_port;
     while (true)
     {
-        send_udp(client_port, server_ip, TFTP_SERVER_PORT, tftp_req,
-                 sizeof(tftp_req_packet_t) + filename_size + TFTP_MODE_SIZE);
+        send_udp(client_port, server_ip, TFTP_SERVER_PORT, tftp_req, req_size);
         ipv6_addr_t saddr;
         ret = recv_udp(client_port, &saddr, &server_port, tftp_resp_buff, sizeof(tftp_resp_buff),
                        server_ip, 0, CLOCK_FREQ / 4);
         if (ret != 0) break;
     }
 
-    if (ret < sizeof(tftp_packet_t))
+    int r = tftp_check_resp(tftp_resp, ret, TFTP_OP_ACK);
+    if (r < 0)
     {
-        printf("TFTP Client: UDP datagram is too small.\n");
-        return -EBADPKT;
-    }
-
-    if (tftp_resp->opcode == TFTP_OP_ERROR)
-    {
-        printf("TFTP Client: Error %d: %s\n",
-               ntohs(tftp_resp->seq), (uint8_t *)(tftp_resp + 1));
-        return -EBADPKT;
-    }
-    else if (tftp_resp->opcode != TFTP_OP_ACK)
-    {
-        printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_resp->opcode));
-        return -EBADPKT;
+        return r;
     }
 
     if (tftp_resp->seq != htons(0))
@@ -215,6 +210,9 @@ int tftp_put_file(char *filename, size_t filename_size, tftp_read_block_t read_b
         printf("TFTP Client: Not First Ack???\n");
         return -EBADPKT;
     }
+
+    size_t total_len = 0;
+    printf("TFTP Client: Sent %lu bytes.", total_len);
 
     uint16_t window = 1;
     while (true)
@@ -244,22 +242,10 @@ int tftp_put_file(char *filename, size_t filename_size, tftp_read_block_t read_b
                 continue;
             }
 
-            if (ret < sizeof(tftp_packet_t))
+            int r = tftp_check_resp(tftp_resp, ret, TFTP_OP_ACK);
+            if (r < 0)
             {
-                printf("TFTP Client: UDP datagram is too small.\n");
-                return -EBADPKT;
-            }
-
-            if (tftp_resp->opcode == TFTP_OP_ERROR)
-            {
-                printf("TFTP Client: Error %d: %s\n",
-                       ntohs(tftp_resp->seq), (uint8_t *)(tftp_resp + 1));
-                return -EBADPKT;
-            }
-            else if (tftp_resp->opcode != TFTP_OP_ACK)
-            {
-                printf("TFTP Client: Unknown Opcode %d\n", ntohs(tftp_resp->opcode));
-                return -EBADPKT;
+                return r;
             }
 
             if (tftp_resp->seq == tftp_packet->seq)
@@ -274,12 +260,22 @@ int tftp_put_file(char *filename, size_t filename_size, tftp_read_block_t read_b
             }
         }
 
-        ++window;
+        total_len += block_size;
+
+        if ((total_len & 0x7ffff) == 0)
+        {
+            printf("\rTFTP Client: Sent %lu bytes.          ", total_len);
+        }
+
         if (block_size < TFTP_CHUNK_SIZE)
         {
+            printf("\nTFTP Client: Done, sent %lu bytes.\n", total_len);
             break;
         }
+
+        ++window;
     }
+    return 0;
 }
 
 void init_tftp()

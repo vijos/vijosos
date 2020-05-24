@@ -41,6 +41,7 @@ typedef struct
 typedef struct
 {
     size_t seq;
+    intptr_t exitcode;
     size_t time_usage;  // clock ticks
     size_t mem_usage;  // KiB
 } judge_resp_t;
@@ -74,7 +75,7 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     printf("Judge Daemon: Receive task %lu.\n", req->seq);
 
     size_t elf_len;
-    int ret = tftp_get_file("elf", 4, judge_tftp_buff, sizeof(judge_tftp_buff), &elf_len);
+    int ret = tftp_get_file("elf", 3, judge_tftp_buff, sizeof(judge_tftp_buff), &elf_len);
     if (ret < 0)
     {
         return ret;
@@ -88,7 +89,7 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     }
 
     uintptr_t stdin_len;
-    ret = tftp_get_file("stdin", 6, judge_tftp_buff, sizeof(judge_tftp_buff), &stdin_len);
+    ret = tftp_get_file("stdin", 5, judge_tftp_buff, sizeof(judge_tftp_buff), &stdin_len);
     if (ret < 0)
     {
         return ret;
@@ -104,7 +105,7 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     }
 
     // stdout buffer
-    size_t stdout_len = 0x10000;
+    size_t stdout_len = 0x10000;  // TODO: magic number
     uintptr_t stdout_va = stdin_va - stdout_len;
     for (size_t pg = stdout_va; pg < stdout_va + stdout_len; pg += PGSIZE)
     {
@@ -140,7 +141,7 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     }
 
     /*
-        Arguments:
+        Setup stack arguments:
         aux
         NULL (envp[])
         NULL (argv[])
@@ -195,11 +196,13 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     uintptr_t freq = hwtimer_get_freq();
     hwtimer_set_oneshot(req->time_limit + req->time_limit / 10 + 2000000); // +10%
     arch_call_user(pt, entry_va, stack_va);
+    resp->exitcode = user_task.exitcode;
     resp->time_usage = user_end_time - user_start_time;
     resp->mem_usage = count_pt(pt, VM_U | VM_A) << PGSHIFT >> 10;
     printf("Judge Daemon: Left user-mode, exitcode %d, %lu cycles, %lu KiB.\n",
-           user_task.exitcode, resp->time_usage, resp->mem_usage);
+           resp->exitcode, resp->time_usage, resp->mem_usage);
 
+    // Upload stdout.
     if (aux->stdout_len > stdout_len)
     {
         aux->stdout_len = stdout_len;
@@ -208,7 +211,7 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     ctx.pt = pt;
     ctx.buff = stdout_va;
     ctx.len = aux->stdout_len;
-    ret = tftp_put_file("stdout", 7, judge_read_block, &ctx);
+    ret = tftp_put_file("stdout", 6, judge_read_block, &ctx);
     if (ret < 0)
     {
         return ret;
@@ -216,7 +219,6 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
 
     resp->seq = req->seq;
     printf("Judge Daemon: Done task %lu.\n", resp->seq);
-    printf("stdout: %s\n", map_page(pt, stdout_va, VM_U | VM_R | VM_W));
     return 0;
 }
 

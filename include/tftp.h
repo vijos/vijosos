@@ -30,7 +30,7 @@ typedef struct
 typedef int (*tftp_read_block_t)(void *ctx, void *buff);
 
 void init_tftp();
-int tftp_get_file(char *filename, size_t filename_size, void *buff, size_t len, size_t *out_len);
-int tftp_put_file(char *filename, size_t filename_size, tftp_read_block_t read_block, void *ctx);
+int tftp_get_file(char *filename, size_t filename_len, void *buff, size_t len, size_t *out_len);
+int tftp_put_file(char *filename, size_t filename_len, tftp_read_block_t read_block, void *ctx);
 
 #endif
