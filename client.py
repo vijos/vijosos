@@ -85,14 +85,19 @@ def benchmark(n):
     for i in range(n):
         exitcode, time_usage, mem_usage, stdout = \
             do_judge('user/riscv/hello.elf', 'stdin.txt', 1.0, 256 * 1024)
+        if time_usage is None:
+            continue
         with open('result.csv', 'a') as f:
             f.write('{},{}\n'.format(int(time_usage * 1e9), mem_usage))
 
 
 exitcode, time_usage, mem_usage, stdout = \
     do_judge('user/riscv/hello.elf', 'stdin.txt', 1.0, 256 * 1024)
-print('Result:', time_usage * 1e6, 'us,', mem_usage, 'KiB')
-print('Exit code:', exitcode)
-print('Stdout:', stdout)
+if time_usage is not None:
+    print('Result:', time_usage * 1e6, 'us,', mem_usage, 'KiB')
+    print('Exit code:', exitcode)
+    print('Stdout:', stdout)
+else:
+    print('Failed.')
 
-benchmark(1000)
+benchmark(10000)
