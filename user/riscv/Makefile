@@ -6,25 +6,38 @@ OBJCOPY = $(PREFIX)objcopy
 OBJDUMP = $(PREFIX)objdump
 
 LIBC = ../../../musl-1.2.0
+LIBSTDCXX = ../../../riscv-gcc/libstdc++-v3/build
+RISCV = /opt/riscv
 
-LIB = $(LIBC)/lib
+CFLAGS = -fno-builtin -nostdlib -static -Wl,--gc-sections -O2 -Wall \
+         -march=rv64imac \
+         -I$(LIBC)/include -I$(LIBC)/obj/include -I$(LIBC)/arch/riscv64 $(DEFINES)
 
-CFLAGS = -fno-builtin -nostdlib -static -Wl,--gc-sections,--print-gc-sections -O2 -Wall \
-         -march=rv64imac -I$(LIBC)/include -I$(LIBC)/obj/include $(DEFINES)
-LDFLAGS = -z separate-code -L$(LIB) #-Tlinker.ld
+CCFLAGS = -nostdinc++ \
+          -I$(LIBSTDCXX)/include \
+          -I$(LIBSTDCXX)/include/riscv64-unknown-linux-gnu \
+          -I$(LIBSTDCXX)/../libsupc++
 
-HEADERS=$(wildcard include/*.h)
-SOURCES=$(wildcard *.c *.S)
-OBJECTS=$(patsubst %.c,%.elf,$(wildcard *.c)) $(patsubst %.S,%.elf,$(wildcard *.S))
+LDFLAGS = -z separate-code -L$(LIBC)/lib -L$(LIBSTDCXX)/src/.libs -L$(LIBSTDCXX)/libsupc++/.libs #-Tlinker.ld
+
+CRTBEGIN_OBJ := $(shell $(GCC) $(CFLAGS) -print-file-name=crtbegin.o)
+CRTEND_OBJ := $(shell $(GCC) $(CFLAGS) -print-file-name=crtend.o)
+
+HEADERS=$(wildcard *.h)
+SOURCES=$(wildcard *.c *.cpp)
+OBJECTS=$(patsubst %.c,%.elf,$(wildcard *.c)) $(patsubst %.cpp,%.elf,$(wildcard *.cpp))
+
+PRE_OBJS = $(LIBC)/lib/crt1.o $(LIBC)/lib/crti.o $(CRTBEGIN_OBJ)
+POST_OBJS = $(CRTEND_OBJ) $(LIBC)/lib/crtn.o
 
 .PHONY: all
-all: hello.elf
+all: hello.elf helloxx.elf
 
 %.elf: %.c $(HEADERS) linker.ld
-	$(GCC) $(CFLAGS) $(LDFLAGS) $(LIB)/crt1.o $(LIB)/crti.o $< -lc $(LIB)/crtn.o -o $@
+	$(GCC) $(CFLAGS) $(LDFLAGS) $(PRE_OBJS) $< $(POST_OBJS) -lgcc_eh -lc -lgcc -o $@
 
-%.elf: %.S $(HEADERS) linker.ld
-	$(GCC) $(CFLAGS) $(LDFLAGS) $< -lc -o $@
+%.elf: %.cpp $(HEADERS) linker.ld
+	$(CC) $(CCFLAGS) $(CFLAGS) $(LDFLAGS) $(PRE_OBJS) $< $(POST_OBJS) -lstdc++ -lsupc++ -lgcc_eh -lc -lgcc -o $@
 
 .PHONY: clean
 clean:

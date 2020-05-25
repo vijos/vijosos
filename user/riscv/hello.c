@@ -1,5 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+__attribute__ ((constructor)) void foo(void)
+{
+	printf("foo is running and printf is available at this point\n");
+}
 
 int main()
 {

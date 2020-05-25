@@ -13,7 +13,7 @@
 #include "stdio.h"
 #include "elf.h"
 
-__attribute__ ((aligned (16))) uint8_t judge_tftp_buff[0x100000];
+__attribute__ ((aligned (16))) uint8_t judge_tftp_buff[0x400000];
 
 // TODO
 #define AT_PAGESZ 6
