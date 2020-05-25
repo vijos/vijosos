@@ -111,6 +111,7 @@ void trap_handler(trap_frame_t *tf)
             user_task.error = -EPAGEFAULT;
             user_task.epc = tf->epc;
             user_task.eval = va;
+            print_trap_frame(tf);
             arch_return_from_user();
         }
     }

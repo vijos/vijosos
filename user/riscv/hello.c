@@ -1,7 +1,12 @@
-#include "syscall.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 int main()
 {
-    for (int i = 0; i < 1 << 20; ++i) asm volatile ("");
+    int *a = (int *)malloc(1 << 20);
+    memset(a, 0, 1 << 20);
+    scanf("%d%d", a, a + 1);
+    printf("%d\n", a[0] + a[1]);
+    free(a);
     return 0;
 }

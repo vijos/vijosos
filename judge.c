@@ -16,8 +16,9 @@
 __attribute__ ((aligned (16))) uint8_t judge_tftp_buff[0x100000];
 
 // TODO
+#define AT_PAGESZ 6
 #define STACK_SIZE 0x400000
-#define HEAP_SIZE 0x10000//000
+#define HEAP_SIZE 0x400000
 #define HEAP_VA 0x10000000
 
 typedef struct
@@ -147,11 +148,12 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     /*
         Setup stack arguments:
         aux
+        NULL
+        NULL (auxv[])
+        PGSIZE
+        AT_PAGESZ (auxv[])
         NULL (envp[])
         NULL (argv[])
-        &aux
-        &envp[]
-        &argv[]
         0 (argc)
     */
 
@@ -170,27 +172,14 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     aux->brk_end = (void *)(heap_va + heap_size);
     uintptr_t aux_va = stack_va;
 
-    stack_va -= sizeof(void *);
-    stack -= sizeof(void *);
-    *(void **)stack = NULL;
-    uintptr_t envp = stack_va;
-
-    stack_va -= sizeof(void *);
-    stack -= sizeof(void *);
-    *(void **)stack = NULL;
-    uintptr_t argv = stack_va;
-
-    stack_va -= sizeof(uintptr_t);
-    stack -= sizeof(uintptr_t);
-    *(uintptr_t *)stack = aux_va;
-
-    stack_va -= sizeof(uintptr_t);
-    stack -= sizeof(uintptr_t);
-    *(uintptr_t *)stack = envp;
-
-    stack_va -= sizeof(uintptr_t);
-    stack -= sizeof(uintptr_t);
-    *(uintptr_t *)stack = argv;
+    for (int i = 0; i < 6; ++i)
+    {
+        stack_va -= sizeof(void *);
+        stack -= sizeof(void *);
+        *(void **)stack = NULL;
+        if (i == 2) *(size_t *)stack = PGSIZE;
+        if (i == 3) *(size_t *)stack = AT_PAGESZ;
+    }
 
     stack_va -= sizeof(size_t);
     stack -= sizeof(size_t);
