@@ -60,10 +60,10 @@ def do_judge(filename, stdin_file, time_limit, mem_limit):
         sock.settimeout(time_limit * 1.1 + 10)
         try:
             while True:
-                resp = recv_packet(sock, 5 * 8)
-                if len(resp) != 5 * 8:
+                resp = recv_packet(sock, 6 * 8)
+                if len(resp) != 6 * 8:
                     continue
-                resp_seq, flags, exitcode, time_usage, mem_usage = struct.unpack('<QQqQQ', resp)
+                resp_seq, flags, error, exitcode, time_usage, mem_usage = struct.unpack('<QQqqQQ', resp)
                 if resp_seq != seq or (flags & JUDGE_RESP_ACK) == 0 \
                    or (flags & JUDGE_RESP_RESULT) == 0:
                     continue
@@ -96,7 +96,8 @@ exitcode, time_usage, mem_usage, stdout = \
 if time_usage is not None:
     print('Result:', time_usage * 1e6, 'us,', mem_usage, 'KiB')
     print('Exit code:', exitcode)
-    print('Stdout:', stdout)
+    print('Output:')
+    print(stdout.decode('UTF-8', 'ignore'))
 else:
     print('Failed.')
 

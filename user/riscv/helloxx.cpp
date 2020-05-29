@@ -8,5 +8,13 @@ int main()
     std::cin >> a >> b;
     std::cout << a + b << std::endl;
     std::cout << "bye, world" << std::endl;
+    try
+    {
+        throw "test";
+    }
+    catch (const char *s)
+    {
+        std::cout << "exception: " << s << std::endl;
+    }
     return 0;
 }

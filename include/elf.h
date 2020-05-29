@@ -144,7 +144,8 @@ typedef struct
   Elf64_Xword	p_align;		/* Segment alignment */
 } Elf64_Phdr;
 
-#define PT_LOAD		1		/* Loadable program segment */
+#define PT_LOAD 1 /* Loadable program segment */
+#define PT_TLS  7
 
 #define PF_X		(1 << 0)	/* Segment is executable */
 #define PF_W		(1 << 1)	/* Segment is writable */
@@ -152,5 +153,7 @@ typedef struct
 
 #include "arch/mmu.h"
 int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va);
+int parse_elf_phdr(void *elf, size_t len,
+                   uintptr_t *phdr_offset, uintptr_t *phent, uintptr_t *phnum);
 
 #endif

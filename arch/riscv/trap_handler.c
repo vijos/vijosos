@@ -107,7 +107,7 @@ void trap_handler(trap_frame_t *tf)
         {
             // Page fault.
             user_end_time = tf->cycle;
-            user_task.exitcode = -1;
+            user_task.exitcode = -11;
             user_task.error = -EPAGEFAULT;
             user_task.epc = tf->epc;
             user_task.eval = va;

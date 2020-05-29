@@ -66,6 +66,10 @@ int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
         {
             printf("LOAD");
         }
+        else if (phdr[i].p_type == PT_TLS)
+        {
+            printf("TLS ");
+        }
         else
         {
             printf("????");
@@ -130,5 +134,18 @@ int load_elf(pte_t *pt, void *elf, size_t len, uintptr_t *entry_va)
     }
 
     puts("Loader: done.\n");
+    return 0;
+}
+
+int parse_elf_phdr(void *elf, size_t len,
+                   uintptr_t *phdr_offset, uintptr_t *phent, uintptr_t *phnum)
+{
+    // Assuming ELF data is checked by load_elf.
+
+    uint8_t *u8 = (uint8_t *)elf;
+    Elf64_Ehdr *elf_header = (Elf64_Ehdr *)u8;
+    *phdr_offset = elf_header->e_phoff;
+    *phent = elf_header->e_phentsize;
+    *phnum = elf_header->e_phnum;
     return 0;
 }

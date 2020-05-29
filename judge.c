@@ -13,43 +13,7 @@
 #include "stdio.h"
 #include "elf.h"
 
-__attribute__ ((aligned (16))) uint8_t judge_tftp_buff[0x400000];
-
-// TODO
-#define AT_PAGESZ 6
-#define STACK_SIZE 0x400000
-#define HEAP_SIZE 0x400000
-#define HEAP_VA 0x10000000
-
-typedef struct
-{
-    uint8_t *stdin_buff;
-    size_t stdin_len;
-    uint8_t *stdout_buff;
-    size_t stdout_cap;
-    size_t stdout_len;
-    void *brk;
-    void *brk_end;
-} aux_t;
-
-typedef struct
-{
-    size_t seq;
-    size_t time_limit;  // clock cycles
-    size_t mem_limit;  // unused
-} judge_req_t;
-
-#define JUDGE_RESP_ACK 1
-#define JUDGE_RESP_RESULT 2
-
-typedef struct
-{
-    size_t seq;
-    uintptr_t flags;
-    intptr_t exitcode;
-    size_t time_usage;  // clock cycles
-    size_t mem_usage;  // KiB
-} judge_resp_t;
+__attribute__ ((aligned (16))) static uint8_t judge_tftp_buff[0x400000];
 
 // read_block context
 typedef struct
@@ -93,17 +57,29 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
         return ret;
     }
 
+    uintptr_t elf_va = USER_TOP - PGSIZE;
+    if ((ret = map_and_copy(pt, elf_va, VM_U | VM_R | VM_A, judge_tftp_buff, PGSIZE)) < 0)
+    {
+        puts("out of memory.\n");
+        return ret;
+    }
+
+    uintptr_t phdr_va, phent, phnum;
+    if ((ret = parse_elf_phdr(judge_tftp_buff, elf_len, &phdr_va, &phent, &phnum)) < 0)
+    {
+        return ret;
+    }
+    phdr_va += elf_va;
+
     uintptr_t stdin_len;
-    ret = tftp_get_file("stdin", 5, judge_tftp_buff, sizeof(judge_tftp_buff), &stdin_len);
-    if (ret < 0)
+    if ((ret = tftp_get_file("stdin", 5, judge_tftp_buff, sizeof(judge_tftp_buff), &stdin_len)) < 0)
     {
         return ret;
     }
 
     // stdin buffer
-    uintptr_t stdin_va = USER_TOP - PGALIGN(stdin_len);
-    ret = map_and_copy(pt, stdin_va, VM_U | VM_R, judge_tftp_buff, stdin_len);
-    if (ret < 0)
+    uintptr_t stdin_va = elf_va - PGALIGN(stdin_len);
+    if ((ret = map_and_copy(pt, stdin_va, VM_U | VM_R | VM_A, judge_tftp_buff, stdin_len)) < 0)
     {
         puts("out of memory.\n");
         return ret;
@@ -152,6 +128,12 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
         NULL (auxv[])
         PGSIZE
         AT_PAGESZ (auxv[])
+        phnum
+        AT_PHNUM (auxv[])
+        phent
+        AT_PHENT (auxv[])
+        phdr_va
+        AT_PHDR (auxv[])
         NULL (envp[])
         NULL (argv[])
         0 (argc)
@@ -170,23 +152,17 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     aux->stdout_len = 0;
     aux->brk = (void *)heap_va;
     aux->brk_end = (void *)(heap_va + heap_size);
-    uintptr_t aux_va = stack_va;
 
-    for (int i = 0; i < 6; ++i)
+    const uintptr_t stack_word[] =
     {
-        stack_va -= sizeof(void *);
-        stack -= sizeof(void *);
-        *(void **)stack = NULL;
-        if (i == 2) *(size_t *)stack = PGSIZE;
-        if (i == 3) *(size_t *)stack = AT_PAGESZ;
-    }
-
-    stack_va -= sizeof(size_t);
-    stack -= sizeof(size_t);
-    *(size_t *)stack = 0;
+        0, 0, 0, AT_PHDR, phdr_va, AT_PHENT, phent, AT_PHNUM, phnum, AT_PAGESZ, PGSIZE, 0, 0
+    };
+    stack_va -= sizeof(stack_word);
+    stack -= sizeof(stack_word);
+    memcpy(stack, stack_word, sizeof(stack_word));
 
     printf("Judge Daemon: Entering user-mode.\n");
-    uintptr_t freq = hwtimer_get_freq();
+    //uintptr_t freq = hwtimer_get_freq();
     hwtimer_set_oneshot(req->time_limit + req->time_limit / 10 + 2000000); // +10%
     arch_call_user(pt, entry_va, stack_va);
     resp->exitcode = user_task.exitcode;
@@ -215,7 +191,7 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     return 0;
 }
 
-__attribute__ ((aligned (16))) uint8_t judge_stack[1024];
+__attribute__ ((aligned (16))) static uint8_t judge_stack[1024];
 static struct task judge_task;
 void judge_entry()
 {
@@ -252,25 +228,11 @@ void judge_entry()
         send_udp(JUDGE_SERVER_PORT, saddr, sport, &resp, sizeof(resp));
 
         mm_take_snapshot();
-        do_judge(&req, &resp);
+        resp.error = do_judge(&req, &resp);
         mm_restore_snapshot();
 
         resp.flags = JUDGE_RESP_ACK | JUDGE_RESP_RESULT;
         send_udp(JUDGE_SERVER_PORT, saddr, sport, &resp, sizeof(resp));
-    }
-
-    for (int i = 0; i < 3; ++i)
-    {
-        req.time_limit = 125000000;
-        req.mem_limit = -1;
-        mm_take_snapshot();
-        do_judge(&req, &resp);
-        mm_restore_snapshot();
-    }
-
-    while (true)
-    {
-        sched_yield();
     }
 }
 
