@@ -20,7 +20,7 @@ CCFLAGS = -nostdinc++ \
 
 LDFLAGS = -z separate-code -L$(LIBC)/lib -L$(LIBSTDCXX)/src/.libs -L$(LIBSTDCXX)/libsupc++/.libs #-Tlinker.ld
 
-CRTBEGIN_OBJ := $(shell $(GCC) $(CFLAGS) -print-file-name=crtbegin.o)
+CRTBEGIN_OBJ := $(shell $(GCC) $(CFLAGS) -print-file-name=crtbeginT.o)
 CRTEND_OBJ := $(shell $(GCC) $(CFLAGS) -print-file-name=crtend.o)
 
 HEADERS=$(wildcard *.h)
