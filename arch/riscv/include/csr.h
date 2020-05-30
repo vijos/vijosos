@@ -151,6 +151,7 @@
 #define PMP_NA4   0x10
 #define PMP_NAPOT 0x18
 
+#define CAUSE_ILLINST  2
 #define CAUSE_ECALL_U  8
 #define CAUSE_PF_FETCH 12
 #define CAUSE_PF_LOAD  13

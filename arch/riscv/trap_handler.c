@@ -116,6 +116,24 @@ void trap_handler(trap_frame_t *tf)
         }
     }
 
+    if (tf->cause == CAUSE_ILLINST)
+    {
+        uintptr_t inst = tf->tval;
+        if (!inst)
+        {
+            // TODO: read inst from memory
+        }
+
+        if ((inst & 0xffeff07f) == 0xc0002073)
+        {
+            // rdcycle and rdtime
+            int reg = (inst >> 7) & 31;
+            tf->x[reg] = read_csr(cycle);
+            tf->epc += 4;
+            return;
+        }
+    }
+
     user_end_time = tf->cycle;
 
     if (!(tf->cause & CAUSE_INT))

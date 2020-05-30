@@ -60,7 +60,11 @@ typedef struct
 
 typedef struct
 {
-    trap_regs_t regs;
+    union
+    {
+        trap_regs_t regs;
+        uintptr_t x[32];
+    };
     uintptr_t status;
     uintptr_t epc;
     uintptr_t tval;
