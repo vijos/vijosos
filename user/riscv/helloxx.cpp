@@ -1,4 +1,3 @@
-#include <clocale>
 #include <iostream>
 
 int main()
