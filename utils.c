@@ -1,6 +1,24 @@
 #include "utils.h"
 #include "stdio.h"
 #include "ip.h"
+#include "arch/mmu.h"
+
+void zero_page(void *pg)
+{
+    uint64_t *end = (uint64_t *)((uint8_t *)pg + PGSIZE);
+    uint64_t *u64 = (uint64_t *)pg;
+    for (; u64 != end; u64 += 8)
+    {
+        u64[0] = 0;
+        u64[1] = 0;
+        u64[2] = 0;
+        u64[3] = 0;
+        u64[4] = 0;
+        u64[5] = 0;
+        u64[6] = 0;
+        u64[7] = 0;
+    }
+}
 
 void print_mem(void *data, size_t len, char delim, int newline)
 {

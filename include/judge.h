@@ -3,15 +3,18 @@
 
 #include "stdint.h"
 
-#define JUDGE_SERVER_PORT 1234
-
 #define AT_PHDR 3
 #define AT_PHENT 4
 #define AT_PHNUM 5
 #define AT_PAGESZ 6
+
+#define JUDGE_SERVER_PORT 1234
+
 #define STACK_SIZE 0x400000
 #define HEAP_SIZE 0x400000
 #define HEAP_VA 0x10000000
+
+#define STDOUT_LIMIT 0x10000
 
 typedef struct
 {

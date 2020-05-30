@@ -58,7 +58,9 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     }
 
     uintptr_t elf_va = USER_TOP - PGSIZE;
-    if ((ret = map_and_copy(pt, elf_va, VM_U | VM_R | VM_A, judge_tftp_buff, PGSIZE)) < 0)
+    size_t copylen = PGSIZE;
+    if (elf_len < copylen) copylen = elf_len;
+    if ((ret = map_and_copy(pt, elf_va, VM_U | VM_R | VM_A, judge_tftp_buff, copylen)) < 0)
     {
         puts("out of memory.\n");
         return ret;
@@ -86,7 +88,7 @@ static int do_judge(judge_req_t *req, judge_resp_t *resp)
     }
 
     // stdout buffer
-    size_t stdout_len = 0x10000;  // TODO: magic number
+    size_t stdout_len = STDOUT_LIMIT;
     uintptr_t stdout_va = stdin_va - stdout_len;
     for (size_t pg = stdout_va; pg < stdout_va + stdout_len; pg += PGSIZE)
     {

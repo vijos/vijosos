@@ -31,7 +31,7 @@ PRE_OBJS = $(LIBC)/lib/crt1.o $(LIBC)/lib/crti.o $(CRTBEGIN_OBJ)
 POST_OBJS = $(CRTEND_OBJ) $(LIBC)/lib/crtn.o
 
 .PHONY: all
-all: hello.elf helloxx.elf empty.elf
+all: hello.elf helloxx.elf empty.elf rdcycle.elf
 
 %.elf: %.c $(HEADERS) linker.ld
 	$(GCC) $(CFLAGS) $(LDFLAGS) $(PRE_OBJS) $< -Wl,--start-group -lgcc -lgcc_eh -lc -Wl,--end-group $(POST_OBJS) -o $@

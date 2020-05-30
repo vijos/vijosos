@@ -20,7 +20,7 @@ pte_t *create_pt()
     }
     else
     {
-        memset(new_pt, 0, PGSIZE);
+        zero_page(new_pt);
     }
     return new_pt;
 }
@@ -31,7 +31,7 @@ static pte_t *get_pt_level(int level, pte_t *pt, uintptr_t idx)
     {
         uintptr_t new_pt = get_free_page();
         if (!new_pt) return NULL;
-        memset(p2v(new_pt), 0, PGSIZE);
+        zero_page(p2v(new_pt));
         pt[idx] = make_pte(level, new_pt, 0);
         return (pte_t *)p2v(new_pt);
     }
@@ -61,7 +61,7 @@ void *map_page(pte_t *pt, uintptr_t va, uint64_t flags)
     {
         uintptr_t new_page = get_free_page();
         if (!new_page) return NULL;
-        memset(p2v(new_page), 0, PGSIZE);
+        zero_page(p2v(new_page));
         *pte = make_pte(0, new_page, flags);
         return (void *)p2v(new_page);
     }

@@ -4,6 +4,7 @@
 #include "stdint.h"
 #include "ip.h"
 
+void zero_page(void *pg);
 void print_mem(void *data, size_t len, char delim, int newline);
 void print_mac(uint8_t *data);
 void print_ipv4(uint8_t *data);
