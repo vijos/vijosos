@@ -1,3 +1,4 @@
+import sys
 import random
 import shutil
 import socket
@@ -92,7 +93,7 @@ def benchmark(n):
 
 
 exitcode, time_usage, mem_usage, stdout = \
-    do_judge('user/riscv/rdcycle.elf', 'stdin.txt', 30.0, 256 * 1024)
+    do_judge('user/riscv/{}.elf'.format(sys.argv[1]), 'stdin.txt', 300.0, 256 * 1024)
 if time_usage is not None:
     print('Result:', time_usage * 1e6, 'us,', mem_usage, 'KiB')
     print('Exit code:', exitcode)
